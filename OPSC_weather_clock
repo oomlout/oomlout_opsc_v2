@@ -1,0 +1,53 @@
+import OPSC
+
+projename = "weather_clock"
+
+save_all = True
+#save_all = False
+
+######  face
+face = True
+if face:
+    obj_name = "face"
+    objects = []
+    objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=150))
+    objects.append(OPSC.opsc_easy("negative", "hole", r="M6"))
+    dist = 100
+    objects.append(OPSC.opsc_easy("negative", "hole",r="M3", pos = [dist,dist,0],rot = [0,0,0]))
+    objects.append(OPSC.opsc_easy("negative", "hole",r="M3", pos = [dist,-dist,0],rot = [0,0,0]))
+    objects.append(OPSC.opsc_easy("negative", "hole",r="M3", pos = [-dist,dist,0],rot = [0,0,0]))
+    objects.append(OPSC.opsc_easy("negative", "hole",r="M3", pos = [-dist,-dist,0],rot = [0,0,0]))
+
+
+
+    objects.append(OPSC.opsc_easy("negative", "slot_keyhole_m20",pos = [dist,0,0],rot = [0,0,0]))
+    objects.append(OPSC.opsc_easy("negative", "slot_keyhole_m20",pos = [-dist,0,0],rot = [0,0,0]))
+    objects.append(OPSC.opsc_easy("negative", "slot_keyhole_m20",pos = [0,dist,0],rot = [0,0,0]))
+    objects.append(OPSC.opsc_easy("negative", "slot_keyhole_m20",pos = [0,-dist,0],rot = [0,0,0]))
+
+    objects.append(OPSC.opsc_easy("negative", "slot_screwhole_m4",pos = [-70,100,0],rot = [0,0,0]))
+    objects.append(OPSC.opsc_easy("negative", "slot_screwhole_m4",pos = [70,100,0],rot = [0,0,0]))
+    #objects = OPSC.test(20)
+    # Create the OpenSCAD object and save it to a file
+    OPSC.opsc_make_object('outputs/' + projename + '/' + projename + "_" + obj_name + '.scad', objects, save_all=save_all)
+
+######  circles
+obj_name = "circle"#
+tilediff = 105
+objects = []
+
+depth = 0; layers = 1
+objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=100/2, pos=[0,0,depth]))
+
+depth -= 3; layers += 1
+objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=20/2, pos=[0,0,depth]))
+
+depth -= 3; layers += 1
+objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=25/2, pos=[0,0,depth]))
+
+
+objects.append(OPSC.opsc_easy("negative", "countersunk", r="M3", pos=[0,0,depth]))
+
+
+
+OPSC.opsc_make_object('outputs/' + projename + '/' + projename + "_"  + obj_name + '.scad', objects, save_all=save_all, layers=layers,tilediff=tilediff)

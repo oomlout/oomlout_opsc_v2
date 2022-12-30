@@ -1,0 +1,34 @@
+import OPSC
+import inspect
+
+def run_all():
+    countersunk_test()
+
+def countersunk_test():
+    projename = "countersunk_test"
+    save_all = True
+    #save_all = False
+
+    ######  countersunk test
+    
+    tilediff = 105
+    objects = []
+    depth = 0; layers = 1
+    objects.append(OPSC.opsc_easy("positive", "rounded_rectangle",size=[50,50,3], pos=[0,0,0]))
+
+    wid = 3
+    hei = 3
+    spacing = 15
+    start = 5/2
+    inc = 0.1/2
+    count = 0
+    for x in range(0,wid):
+        for y in range(0,hei):
+            pos = [(-spacing*(wid-1))/2 + x*spacing,(-spacing*(hei-1))/2 + y*spacing,0]
+            rad = start + inc * count; count += 1
+            objects.append(OPSC.opsc_easy("negative", "hole", r=rad, pos=pos))
+
+
+    OPSC.opsc_make_object('tests/' + projename + '/part.scad', objects, save_all=save_all, layers=layers,tilediff=tilediff)
+
+run_all()
