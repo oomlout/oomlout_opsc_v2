@@ -1,13 +1,20 @@
+
 import OPSC
+import oomB
 
 projename = "weather_clock"
+copy_to_laser = True
+index = 5
 
-save_all = True
-#save_all = False
+
+save_type = "all"
+save_type = "dxf"
+#save_type = "none"
 
 ######  face
-face = True
-if face:
+run = True
+object_count = 1
+if run:
     obj_name = "face"
     objects = []
     objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=150))
@@ -29,25 +36,35 @@ if face:
     objects.append(OPSC.opsc_easy("negative", "slot_screwhole_m4",pos = [70,100,0],rot = [0,0,0]))
     #objects = OPSC.test(20)
     # Create the OpenSCAD object and save it to a file
-    OPSC.opsc_make_object('outputs/' + projename + '/' + projename + "_" + obj_name + '.scad', objects, save_all=save_all)
+    OPSC.opsc_make_object('outputs/' + projename + '/' + projename + "_" + obj_name + '.scad', objects, save_type=save_type)
+    OPSC.opsc_make_object('outputs/' + projename + '/object_' + str(object_count).zfill(2) + '.scad', objects, save_type=save_type)
 
 ######  circles
+object_count += 1
 obj_name = "circle"#
 tilediff = 105
-objects = []
+layers = 3
+run = True
+if run:
+    objects = []
 
-depth = 0; layers = 1
-objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=100/2, pos=[0,0,depth]))
+    depth = 0; layers = 1
+    objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=100/2, pos=[0,0,depth]))
 
-depth -= 3; layers += 1
-objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=20/2, pos=[0,0,depth]))
+    depth += 3; layers += 1
+    objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=20/2, pos=[0,0,depth]))
 
-depth -= 3; layers += 1
-objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=25/2, pos=[0,0,depth]))
+    depth += 3; layers += 1
+    objects.append(OPSC.opsc_easy("positive", "cylinder", h =3, r=30/2, pos=[0,0,depth]))
+
+    depth += 3; layers += 1
+    objects.append(OPSC.opsc_easy("negative", "countersunk", r="M3", pos=[0,0,depth],rot=[0,180,0]))
+    #objects.append(OPSC.opsc_easy("negative", "countersunk", r="M3", pos=[0,0,9],rot=[0,180,0]))
 
 
-objects.append(OPSC.opsc_easy("negative", "countersunk", r="M3", pos=[0,0,depth]))
 
+    OPSC.opsc_make_object('outputs/' + projename + '/' + projename + "_"  + obj_name + '.scad', objects, layers=layers,tilediff=tilediff, save_type=save_type)
+    OPSC.opsc_make_object('outputs/' + projename + '/object_' + str(object_count).zfill(2) + '.scad', objects, layers=layers,tilediff=tilediff, save_type=save_type)
 
-
-OPSC.opsc_make_object('outputs/' + projename + '/' + projename + "_"  + obj_name + '.scad', objects, save_all=save_all, layers=layers,tilediff=tilediff)
+if copy_to_laser:
+    oomB.files_copy_laser('outputs/' + projename, index)

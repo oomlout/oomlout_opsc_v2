@@ -1,5 +1,5 @@
-import OPSC
-import OPSC_library_gen
+import opsc
+import opsc_library_gen
 
 
 
@@ -24,8 +24,8 @@ objects = [
 
 
 
-objects = OPSC.test(20)
+objects = opsc.test(20)
 
-#OPSC.opsc_make_object('outputs/my_object.scad', objects, save_all=True)
+#opsc.opsc_make_object('outputs/my_object.scad', objects, save_all=True)
 
-OPSC_library_gen.gen_library({},save_file=True)
+opsc_library_gen.gen_library({},save_file=True)

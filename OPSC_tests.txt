@@ -19,7 +19,7 @@ def countersunk_test():
     wid = 3
     hei = 3
     spacing = 15
-    start = 5/2
+    start = 4.5/2
     inc = 0.1/2
     count = 0
     for x in range(0,wid):

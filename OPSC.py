@@ -2,38 +2,95 @@ from solid import *
 import os
 import subprocess
 
-import OPSC_library_gen
+import oomB
+
+import opsc_library_gen
+
+mode = "laser"
+#mode = "3d_print"
 
 defined_objects = {}
 
 radius_dict = {}
-radius_dict['M6'] = 6.5/2
-radius_dict['M3'] = 3.3/2
-
 countersunk_dict = {}
-countersunk_dict['M3'] = {}
-countersunk_dict['M3']['little_rad'] = radius_dict['M3']
-countersunk_dict['M3']['big_rad'] = (5.5+0.6)/2
-countersunk_dict['M3']['height'] = 1.7
 
 
-def opsc_make_object(filename, objects, save_all=False,resolution=50, layers = 1, tilediff = 200):
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    final_object = opsc_get_object(objects)
-    # Save the final object to the specified filename
-    filename_laser = filename.replace(".scad","-laser.scad")
-    scad_render_to_file(final_object, filename, file_header='$fn = %s;' % resolution, include_orig_code=True)
-    scad_render_to_file(getLaser(final_object, layers=layers, tilediff=tilediff), filename, file_header='$fn = %s;' % resolution, include_orig_code=True)
-    if save_all:
-        saveToAll(filename_laser)
-    if save_all:
-        saveToAll(filename)
+def set_mode(m):
+    global mode
+    mode = m
+    radius_dict['M6'] = 6.5/2
+    radius_dict['M3'] = 3.3/2
+    if mode == "laser":
+        radius_dict['M6'] = 6/2
+        radius_dict['M3'] = 3/2
+
+    countersunk_dict['M3'] = {}
+    countersunk_dict['M3']['little_rad'] = radius_dict['M3']
+    countersunk_dict['M3']['big_rad'] = (5.5+0.6)/2
+    if mode == "laser":
+        countersunk_dict['M3']['big_rad'] = (4.75+0.6)/2
+        countersunk_dict['M3']['little_rad'] = (4.75+0.6)/2
+
+    countersunk_dict['M3']['height'] = 1.7
 
 
-def opsc_get_object(objects):
-    # Create the solidpython objects
-    positive_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'positive']
-    negative_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'negative']
+def opsc_make_object(filename, objects, save_type="none",resolution=50, layers = 1, tilediff = 200, mode="laser", overwrite=True, start = 1.5):
+    filename_test = filename.replace(".scad",".png")
+    if overwrite or not os.path.exists(filename_test):
+        set_mode(mode)
+        save_type = save_type.lower()
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        final_object = opsc_get_object(objects, mode = mode)
+        # Save the final object to the specified filename    
+        scad_render_to_file(final_object, filename, file_header='$fn = %s;' % resolution, include_orig_code=False)
+        if save_type == "all":
+            saveToAll(filename)
+        elif save_type == "dxf":
+            saveToDxf(filename)
+        if mode == "laser":
+            filename_laser = filename.replace(".scad","_flat.scad")
+            scad_render_to_file(getLaser(final_object, layers=layers, tilediff=tilediff, start = start), filename_laser, file_header='$fn = %s;' % resolution, include_orig_code=False) 
+            if save_type == "all":
+                saveToAll(filename_laser)
+            elif save_type == "dxf" or save_type == "laser":
+                saveToDxf(filename_laser)
+    else:
+        print("File already exists: " + filename)
+
+
+def opsc_get_object(objects, mode = "laser"):
+    # Create the solidpython objects only include the positive objects and if they don't have inclusion or their inclusion is either all or mode
+    # Initialize an empty list to store the results
+    positive_objects = []
+
+    # Iterate over the "objects" list
+    for obj in objects:
+        # Check if the current object has a "type" key with a value of "positive"
+        if obj['type'] == 'positive' or obj['type'] == 'p':
+            # Check if the current object has an "inclusion" key and its value matches "mode",
+            # or if the current object does not have an "inclusion" key at all
+            if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
+                # Call the "get_opsc_item" function with the current object as an argument
+                opsc_item = get_opsc_item(obj)
+                # Add the result to the "positive_objects" list
+                positive_objects.append(opsc_item)
+# Initialize an empty list to store the results
+    negative_objects = []
+
+    # Iterate over the "objects" list
+    for obj in objects:
+        # Check if the current object has a "type" key with a value of "negative"
+        if obj['type'] == 'negative' or obj['type'] == 'n':
+            # Check if the current object has an "inclusion" key and its value matches "mode",
+            # or if the current object does not have an "inclusion" key at all
+            if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
+                # Call the "get_opsc_item" function with the current object as an argument
+                opsc_item = get_opsc_item(obj)
+                # Add the result to the "negative_objects" list
+                negative_objects.append(opsc_item)
+    
+    #positive_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'positive']
+    #negative_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'negative']
     # Union the positive objects
     positive_object = union()(*positive_objects)
     # Union the negative objects
@@ -48,7 +105,7 @@ def get_opsc_item(params):
     basic_shapes = ['cube', 'sphere', 'cylinder']
     
     # An array of function names for other shapes
-    other_shapes = ['hole', 'slot', 'rounded_rectangle', 'countersunk']
+    other_shapes = ['hole', 'slot', 'slot_small', 'rounded_rectangle', 'countersunk', 'polyg', 'bearing']
     
 
 
@@ -68,9 +125,62 @@ def get_opsc_item(params):
         allowed_keys = {'size', 'r', 'r1', 'r2', 'd', 'h', 'rw', 'rh', 'dw', 'dh'}
         shape_params = {k: v for k, v in params.items() if k in allowed_keys}
 
+        #params['m'] = "#"
+        ###split for adding modifier
+        try:
+            m = params['m']
+            func = globals()[params['shape']]
+            return_value = get_opsc_transform(params,func(**shape_params))
+            return_value = (return_value).set_modifier(m)
+            return return_value
+        except KeyError as e:
+            return get_opsc_transform(params,globals()[params['shape']](**shape_params))
+        
+    elif params['shape'] == 'polygon':
+        # Remove shape and unexpected dictionary values
+        try:
+            h  = params['height']
+        except KeyError as e:
+            h = params['h']
+        allowed_keys = {'points'}
+        shape_params = {k: v for k, v in params.items() if k in allowed_keys}
+
         # Call the corresponding function for the shape parameter, using ** notation to pass the shape_params dictionary as keyword arguments
-        return get_opsc_transform(params,globals()[params['shape']](**shape_params))
-    
+        params["rot"] = [0,0,0]        
+        try:
+            m = params['m']
+            func = globals()[params['shape']]
+            return_value = get_opsc_transform(params,linear_extrude(h)(globals()[params['shape']](**shape_params)))
+            return_value = (return_value).set_modifier(m)
+            return return_value
+        except KeyError as e:
+            return_value = get_opsc_transform(params,linear_extrude(h)(globals()[params['shape']](**shape_params)))
+            return_value = (return_value)
+            return return_value
+    elif params['shape'] == 'text':        
+        # Remove shape and unexpected dictionary values
+        h  = params['height']
+        center = params['center']
+        if center:
+            params['halign'] = 'center'
+            params['valign'] = 'center'
+        allowed_keys = {'text', 'size', 'font', 'halign', 'valign', 'spacing', 'direction', 'language', 'script'}
+        shape_params = {k: v for k, v in params.items() if k in allowed_keys}
+
+        # Call the corresponding function for the shape parameter, using ** notation to pass the shape_params dictionary as keyword arguments
+        params["rot"] = [0,0,0]        
+        try:
+            m = params['m']
+            func = globals()[params['shape']]
+            return_value = get_opsc_transform(params,linear_extrude(h)(globals()[params['shape']](**shape_params)))
+            return_value = (return_value).set_modifier(m)
+            return return_value
+        except KeyError as e:
+            return_value = get_opsc_transform(params,linear_extrude(h)(globals()[params['shape']](**shape_params)))
+            return_value = (return_value)
+            return return_value
+
+
     # If the object type is not a basic shape, check if it's a defined object or one of the other shapes
     elif params['shape'] in other_shapes:
         # Call the corresponding function for the shape parameter, passing the params dictionary as an argument
@@ -108,12 +218,27 @@ def get_opsc_transform(params, solid_obj):
 
 import random
 
+def opsc_easy_array(type, shape, repeats, pos_start, shift_arr, **kwargs):
+    for i in range(0,3):
+        repeats.append(1)
+        pos_start.append(0)
+        shift_arr.append(0)
+    return_objects = []
+
+    for x in range(0,repeats[0]):
+        for y in range(0,repeats[1]):
+            for z in range(0,repeats[2]):
+                return_objects.append(opsc_easy(type, shape, pos=[pos_start[0]+x*shift_arr[0],pos_start[1]+y*shift_arr[1],pos_start[2]+z*shift_arr[2]], **kwargs))
+    return return_objects                
+
+
+
 def opsc_easy(type, shape, **kwargs):
     obj = {
         'type': type,
         'shape': shape
     }
-    for param in ['size', 'r', 'r1', 'r2', 'd', 'h', 'rw', 'rh', 'dw', 'dh', 'pos', 'x', 'y', 'z', 'rot', 'rotX', 'rotY', 'rotZ', "w"]:
+    for param in ['size', 'r', 'r1', 'r2', 'd', 'h', 'rw', 'rh', 'dw', 'dh', 'pos', 'x', 'y', 'z', 'rot', 'rotX', 'rotY', 'rotZ', "w", "inclusion", 'sides', 'height', "m", "id", "od", "depth"]:
         if param in kwargs:
             obj[param] = kwargs[param]
     return obj
@@ -144,19 +269,44 @@ def countersunk(params):
     hp = copy.deepcopy(p2)
     hp["type"] = "positive"
     hp["shape"] = "hole"
+    del hp["rot"]
     hol = get_opsc_item(hp)
+    
     cp = copy.deepcopy(p2)
     cp["h"] = countersunk_dict[counter_rad]["height"]
     cp["r2"] = countersunk_dict[counter_rad]["little_rad"]
     cp["r1"] = countersunk_dict[counter_rad]["big_rad"]
     del cp["r"]
+    del cp["rot"]
     cp["type"] = "positive"
     cp["shape"] = "cylinder"
     cp["pos"] = [0,0,0]
+
     top = get_opsc_item(cp)
     return union()(hol,top)
 
 
+
+def slot_small(params):  
+    p2 = copy.deepcopy(params) 
+    if isinstance(p2['r'], str):
+        p2['r'] = radius_dict[p2['r']]
+    p2["type"] = "positive"
+    p2["shape"] = "hole"
+    try:
+        del p2["rot"]
+    except:
+        pass
+    p2["pos"] = [0,0,0]
+    left = copy.deepcopy(p2)
+    right = copy.deepcopy(p2)
+    left["pos"][0] = p2["w"] / 2 
+    
+    right["pos"][0] = -p2["w"] / 2
+    pass
+    leftObj = get_opsc_item(left)
+    rightObj = get_opsc_item(right)
+    return hull()(leftObj, rightObj)
 
 def slot(params):  
     p2 = copy.deepcopy(params) 
@@ -164,7 +314,10 @@ def slot(params):
         p2['r'] = radius_dict[p2['r']]
     p2["type"] = "positive"
     p2["shape"] = "hole"
-    del p2["rot"]
+    try:
+        del p2["rot"]
+    except:
+        pass
     p2["pos"] = [0,0,0]
     left = copy.deepcopy(p2)
     right = copy.deepcopy(p2)
@@ -176,8 +329,10 @@ def slot(params):
     rightObj = get_opsc_item(right)
     return hull()(leftObj, rightObj)
 
-def rounded_rectangle(params):   
+def rounded_rectangle(params): 
+    m = params.get("m", "")  
     p2 = copy.deepcopy(params) 
+    p2["m"] = ""
     p2["h"] = p2["size"][2]
     p2["pos"] = p2.get("pos", [0, 0, 0]) 
     p2["type"] = "positive"
@@ -208,16 +363,81 @@ def rounded_rectangle(params):
     tro = get_opsc_item(tr)
     blo = get_opsc_item(bl)
     bro = get_opsc_item(br)    
-    return hull()(tlo, tro, blo, bro)
+    return hull()(tlo, tro, blo, bro).set_modifier(m)
 
 
+
+def bearing(params):
+    p2 = copy.deepcopy(params) 
+    id = params["id"]
+    od = params["od"]
+    pos = params["pos"]
+    depth = params["depth"]
+    clearance_original = params.get("clearance", 2)
+
+    p2["shape"] = "cylinder"
+    p2["h"] = depth
+    main_inner = copy.deepcopy(p2)
+    main_inner["r"] = id
+    main_outer = copy.deepcopy(p2)
+    main_outer["r"] = od
+    
+    ## Extra clearance
+    p2["h"] = 100
+    p2["pos"] = [pos[0], pos[1], pos[2] - 50]
+    extra_inner = copy.deepcopy(p2)
+    extra_outer = copy.deepcopy(p2)
+
+    clearance = (od - id - clearance_original/2 )
+    extra_inner["r"] = id + clearance/2
+    extra_outer["r"] = od - clearance/2
+
+    mi = get_opsc_item(main_inner)
+    mo = get_opsc_item(main_outer)
+    ei = get_opsc_item(extra_inner)
+    eo = get_opsc_item(extra_outer)
+
+    shape = translate([0,0,-depth/2])(union()(difference()(mo,mi), difference()(eo,ei)))
+
+    return shape
+
+
+
+    return get_opsc_item(p2)
+
+def polyg(params):
+    p2 = copy.deepcopy(params) 
+    p2["type"] = "positive"
+    p2["shape"] = "polygon"
+    p2["pos"] = [0,0,0]
+    sides = p2["sides"]
+    radius = p2["r"]    
+    angles = [i * 360 / sides for i in range(sides)]
+    points = regular_polygon(sides, radius)
+    
+    p2["points"] = points
+    return get_opsc_item(p2)
+
+import math
+
+def regular_polygon(num_sides, radius):
+    # Calculate the angle between each side
+    angle = 2 * math.pi / num_sides
+
+    # Calculate the points of the polygon
+    points = []
+    for i in range(num_sides):
+        x = radius * math.cos(i * angle)
+        y = radius * math.sin(i * angle)
+        points.append((x, y))
+    return points
 
 def import_scad_object(filename):
     # Import the .scad file and convert it to a solidpython object
     #filename = "parts"
     obj = import_scad(filename)
     return obj.main()
-    
+
 
 
 import os
@@ -227,7 +447,7 @@ import solid as solidpython
 
 
 def load_scad_objects():
-    OPSC_library_gen.gen_library(defined_objects)
+    opsc_library_gen.gen_library(defined_objects)
 
 import random
 
@@ -270,15 +490,20 @@ def test(num_objects):
 
 ####### old file saving
 def saveToAll(fileIn):
+    saveToFileAll(fileIn)
+    
+def saveToTheRest(fileIn):
+
     saveToDxf(fileIn)
     saveToPng(fileIn)
-    saveToStl(fileIn)
     saveToSvg(fileIn)
 
-def saveToDxf(fileIn, fileOut=""):
+def saveToDxf(fileIn, fileOut="", copy_to_laser=True):
     if fileOut == "":
         fileOut = fileIn.replace(".scad",".dxf")
     saveToFile(fileIn, fileOut)
+
+
     
 def saveToPng(fileIn, fileOut="",extra="--render"):
     if fileOut == "":
@@ -296,7 +521,7 @@ def saveToSvg(fileIn, fileOut=""):
     saveToFile(fileIn, fileOut)
 
 def saveToFile(fileIn, fileOut,extra=""):
-    extra = extra + " --colorscheme Tomorrow"
+    #extra = extra + " --colorscheme Tomorrow"
 
     launchStr = 'openscad -o "' + fileOut + '"' + extra + ' "' + fileIn + '"'
     if ".png" in fileOut:
@@ -305,10 +530,22 @@ def saveToFile(fileIn, fileOut,extra=""):
     subprocess.run(launchStr)
     x=0
 
-def getLaser(final_object,start=0,layers=1,thickness=-3,tilediff=200):
+def saveToFileAll(fileIn, extra=""):
+    #extra = extra + " --colorscheme Tomorrow"
+    formats = ["dxf","png","svg","stl","csg"]
+    format_string = ""
+    for f in formats:
+        file_out = fileIn.replace(".scad","."+f)
+        format_string = f'{format_string} -o "{file_out}" '
+    launchStr = f'openscad {format_string} {extra} --render "{fileIn}"'
+    print("            saveToFile launch string: " + launchStr)
+    subprocess.run(launchStr)
+    x=0
+
+def getLaser(final_object,start=1.5,layers=1,thickness=3,tilediff=200):
         rv= []
 
-        for x in range(layers):
+        for x in range(int(layers)):
             rv.append(translate([0,x*tilediff,0])(
                     projection()(
                         intersection()(translate([-500,-500,start+x*thickness])(cube(size=[1000,1000,0.1])),
@@ -320,4 +557,5 @@ def getLaser(final_object,start=0,layers=1,thickness=-3,tilediff=200):
             
         return union()(rv)
 
+set_mode("laser")
 load_scad_objects()
