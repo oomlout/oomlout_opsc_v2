@@ -3,7 +3,7 @@ import opsc_library_gen
 
 
 name_project = "drill_bit_handle"
-diameter_drill_bit = 3.4
+diameter_drill_bit = 6.4
 depth_drill_bit = 20
 pos_drill_bit = [0,0,0]
 diameter_handle = 15
@@ -40,4 +40,4 @@ objects = [
 
 opsc.opsc_make_object(f'outputs/{name_project}/working.scad', objects, save_type="all")
 
-opsc_library_gen.gen_library({},save_file=True)
+#opsc_library_gen.gen_library({},save_file=True)

@@ -12,7 +12,7 @@ difference() {
 	union() {
 		translate(v = [0, 0, 0]) {
 			rotate(a = [0, 0, 0]) {
-				cylinder(h = 20, r = 1.7000000000);
+				cylinder(h = 20, r = 3.2000000000);
 			}
 		}
 	}

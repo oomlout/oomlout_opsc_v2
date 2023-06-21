@@ -64,37 +64,47 @@ def opsc_get_object(objects, mode = "laser"):
     positive_objects = []
 
     # Iterate over the "objects" list
-    for obj in objects:
+    for objs in objects:
+        #if objs is a list put it in a list
+        #unpacking in case its a list of lists
+        if isinstance(objs, dict):
+            objs = [objs]
+        for obj in objs:
         # Check if the current object has a "type" key with a value of "positive"
-        if obj['type'] == 'positive' or obj['type'] == 'p':
-            # Check if the current object has an "inclusion" key and its value matches "mode",
-            # or if the current object does not have an "inclusion" key at all
-            if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
-                # Call the "get_opsc_item" function with the current object as an argument
-                opsc_item = get_opsc_item(obj)
-                # Add the result to the "positive_objects" list
-                positive_objects.append(opsc_item)
+            if obj['type'] == 'positive' or obj['type'] == 'p':
+                # Check if the current object has an "inclusion" key and its value matches "mode",
+                # or if the current object does not have an "inclusion" key at all
+                if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
+                    # Call the "get_opsc_item" function with the current object as an argument
+                    opsc_item = get_opsc_item(obj)
+                    # Add the result to the "positive_objects" list
+                    positive_objects.append(opsc_item)
 # Initialize an empty list to store the results
     negative_objects = []
 
     # Iterate over the "objects" list
-    for obj in objects:
-        # Check if the current object has a "type" key with a value of "negative"
-        if obj['type'] == 'negative' or obj['type'] == 'n':
-            # Check if the current object has an "inclusion" key and its value matches "mode",
-            # or if the current object does not have an "inclusion" key at all
-            if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
-                # Call the "get_opsc_item" function with the current object as an argument
-                opsc_item = get_opsc_item(obj)
-                # Add the result to the "negative_objects" list
-                negative_objects.append(opsc_item)
-    
-    #positive_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'positive']
-    #negative_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'negative']
-    # Union the positive objects
-    positive_object = union()(*positive_objects)
-    # Union the negative objects
-    negative_object = union()(*negative_objects)
+    for objs in objects:        
+        #if objs is a list put it in a list
+        #unpacking in case its a list of lists
+        if isinstance(objs, dict):
+            objs = [objs]
+        for obj in objs:
+            # Check if the current object has a "type" key with a value of "negative"
+            if obj['type'] == 'negative' or obj['type'] == 'n':
+                # Check if the current object has an "inclusion" key and its value matches "mode",
+                # or if the current object does not have an "inclusion" key at all
+                if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
+                    # Call the "get_opsc_item" function with the current object as an argument
+                    opsc_item = get_opsc_item(obj)
+                    # Add the result to the "negative_objects" list
+                    negative_objects.append(opsc_item)
+        
+        #positive_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'positive']
+        #negative_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'negative']
+        # Union the positive objects
+        positive_object = union()(*positive_objects)
+        # Union the negative objects
+        negative_object = union()(*negative_objects)
     # Create the final object by subtracting the negative objects from the positive objects
     return difference()(positive_object, negative_object)
 
@@ -105,7 +115,7 @@ def get_opsc_item(params):
     basic_shapes = ['cube', 'sphere', 'cylinder']
     
     # An array of function names for other shapes
-    other_shapes = ['hole', 'slot', 'slot_small', 'rounded_rectangle', 'countersunk', 'polyg', 'bearing']
+    other_shapes = ['hole', 'slot', 'slot_small', 'rounded_rectangle', 'rounded_rectangle_extra', 'sphere_rectangle', 'countersunk', 'polyg', 'polyg_tube', 'polyg_tube_half', 'bearing', 'oring', 'vpulley', ]
     
 
 
@@ -140,13 +150,17 @@ def get_opsc_item(params):
         # Remove shape and unexpected dictionary values
         try:
             h  = params['height']
-        except KeyError as e:
-            h = params['h']
+        except:
+            try: 
+                h  = params['depth']
+            except KeyError as e:
+                h = params['h']
+            allowed_keys = {'points'}
         allowed_keys = {'points'}
         shape_params = {k: v for k, v in params.items() if k in allowed_keys}
 
         # Call the corresponding function for the shape parameter, using ** notation to pass the shape_params dictionary as keyword arguments
-        params["rot"] = [0,0,0]        
+        #params["rot"] = [0,0,0]        
         try:
             m = params['m']
             func = globals()[params['shape']]
@@ -160,7 +174,7 @@ def get_opsc_item(params):
     elif params['shape'] == 'text':        
         # Remove shape and unexpected dictionary values
         h  = params['height']
-        center = params['center']
+        center = params.get('center', False)
         if center:
             params['halign'] = 'center'
             params['valign'] = 'center'
@@ -168,7 +182,7 @@ def get_opsc_item(params):
         shape_params = {k: v for k, v in params.items() if k in allowed_keys}
 
         # Call the corresponding function for the shape parameter, using ** notation to pass the shape_params dictionary as keyword arguments
-        params["rot"] = [0,0,0]        
+        #params["rot"] = [0,0,0]        
         try:
             m = params['m']
             func = globals()[params['shape']]
@@ -238,7 +252,7 @@ def opsc_easy(type, shape, **kwargs):
         'type': type,
         'shape': shape
     }
-    for param in ['size', 'r', 'r1', 'r2', 'd', 'h', 'rw', 'rh', 'dw', 'dh', 'pos', 'x', 'y', 'z', 'rot', 'rotX', 'rotY', 'rotZ', "w", "inclusion", 'sides', 'height', "m", "id", "od", "depth"]:
+    for param in ['size', 'r', 'r1', 'r2', 'd', 'h', 'rw', 'rh', 'dw', 'dh', 'pos', 'x', 'y', 'z', 'rot', 'rotX', 'rotY', 'rotZ', "w", "inclusion", 'sides', 'height', "m", "id", "od", "depth", "exclude_clearance", "clearance", "points","text","valign","halign","font","inset"]:
         if param in kwargs:
             obj[param] = kwargs[param]
     return obj
@@ -366,9 +380,152 @@ def rounded_rectangle(params):
     return hull()(tlo, tro, blo, bro).set_modifier(m)
 
 
+def rounded_rectangle_extra(params): 
+    m = params.get("m", "")
+
+    inset = params.get("inset", 0)
+    radius = params.get("r", 5)
+    rotY = params.get("rotY", 0)
+    params.pop("r")    
+    
+    params["r1"] = radius
+    params["r2"] = radius - inset/2
+    change = params["r1"]
+    if rotY == 180:        
+        params["r2"] = radius
+        params["r1"] = radius - inset/2
+        change = params["r2"]
+
+
+    p2 = copy.deepcopy(params) 
+    p2["m"] = ""
+    p2["h"] = p2["size"][2]
+    p2["pos"] = p2.get("pos", [0, 0, 0]) 
+    p2["type"] = "positive"
+    p2["shape"] = "cylinder"
+    p2["pos"] = [0,0,0]
+    
+    if 'rot' in p2:
+        del p2["rot"]   
+    
+    tl = copy.deepcopy(p2)
+    tr = copy.deepcopy(p2)
+    bl = copy.deepcopy(p2)
+    br = copy.deepcopy(p2)
+    tl["pos"][0] = -(p2["size"][0] - change*2)/2
+    tl["pos"][1] = (p2["size"][1] - change*2)/2
+    tr["pos"][0] = (p2["size"][0] - change*2)/2
+    tr["pos"][1] = (p2["size"][1] - change*2)/2
+    bl["pos"][0] = -(p2["size"][0] - change*2)/2
+    bl["pos"][1] = -(p2["size"][1] - change*2)/2
+    br["pos"][0] = (p2["size"][0] - change*2)/2
+    br["pos"][1] = -(p2["size"][1] - change*2)/2
+    del tl["size"]
+    del tr["size"]
+    del bl["size"]
+    del br["size"]
+    tlo = get_opsc_item(tl)
+    tro = get_opsc_item(tr)
+    blo = get_opsc_item(bl)
+    bro = get_opsc_item(br)    
+    return hull()(tlo, tro, blo, bro).set_modifier(m)
+
+
+
+def sphere_rectangle(params): 
+    m = params.get("m", "")  
+    
+    
+    #radius
+    if 'rot' in params:
+        del params["rot"]   
+    if 'r' not in params:
+        params["r"] = 5 
+    
+    p2 = copy.deepcopy(params) 
+
+
+    
+
+    height = p2["size"][2]
+    radius = p2["r"]
+    p2["m"] = ""
+    p2["h"] = height-radius*2
+    p2["pos"] = p2.get("pos", [0, 0, 0]) 
+    p2["type"] = "positive"
+    p2["shape"] = "hole"
+    p2["pos"] = [0,0,radius]
+    
+    p3 = copy.deepcopy(params)
+    radius = p3["r"]
+    p3["m"] = ""    
+    p3["pos"] = p3.get("pos", [0, 0, 0]) 
+    p3["type"] = "positive"
+    p3["shape"] = "sphere"
+    p3["pos"] = [0,0,radius]
+    
+    p4 = copy.deepcopy(params)
+    radius = p4["r"]
+    p4["m"] = ""    
+    p4["pos"] = p4.get("pos", [0, 0, 0]) 
+    p4["type"] = "positive"
+    p4["shape"] = "sphere"
+    #p4["m"] = "#"
+    p4["pos"] = [0,0,height-radius]
+    
+
+    tls = [copy.deepcopy(p2), copy.deepcopy(p3), copy.deepcopy(p4)]
+    trs = [copy.deepcopy(p2), copy.deepcopy(p3), copy.deepcopy(p4)]
+    bls = [copy.deepcopy(p2), copy.deepcopy(p3), copy.deepcopy(p4)]
+    brs = [copy.deepcopy(p2), copy.deepcopy(p3), copy.deepcopy(p4)]
+
+    for tl in tls:     
+        tl["pos"][0] = -(p2["size"][0] - p2["r"]*2)/2
+        tl["pos"][1] = (p2["size"][1] - p2["r"]*2)/2
+        del tl["size"]
+    
+    for tr in trs:
+        tr["pos"][0] = (p2["size"][0] - p2["r"]*2)/2
+        tr["pos"][1] = (p2["size"][1] - p2["r"]*2)/2
+        del tr["size"]
+    
+    for bl in bls:
+        bl["pos"][0] = -(p2["size"][0] - p2["r"]*2)/2
+        bl["pos"][1] = -(p2["size"][1] - p2["r"]*2)/2
+        del bl["size"]
+    
+    for br in brs:
+        br["pos"][0] = (p2["size"][0] - p2["r"]*2)/2
+        br["pos"][1] = -(p2["size"][1] - p2["r"]*2)/2
+        del br["size"]
+
+    
+    tlo = []
+    for tl in tls:
+        tlo.append(get_opsc_item(tl))
+    tlo = union()(tlo)
+    tro = []
+    for tr in trs:
+        tro.append(get_opsc_item(tr))
+    tro = union()(tro)
+    blo = []
+    for bl in bls:
+        blo.append(get_opsc_item(bl))
+    blo = union()(blo)
+    bro = []
+    for br in brs:
+        bro.append(get_opsc_item(br))
+    bro = union()(bro)
+
+    #return tlo.set_modifier(m)
+
+    return hull()(tlo, tro, blo, bro).set_modifier(m)
+
+
 
 def bearing(params):
     p2 = copy.deepcopy(params) 
+    #p2["m"] = "#"
     id = params["id"]
     od = params["od"]
     pos = params["pos"]
@@ -389,28 +546,105 @@ def bearing(params):
     extra_outer = copy.deepcopy(p2)
 
     clearance = (od - id - clearance_original/2 )
+    exclude_clearance = params.get("exclude_clearance", False)
+
+    
     extra_inner["r"] = id + clearance/2
     extra_outer["r"] = od - clearance/2
 
     mi = get_opsc_item(main_inner)
     mo = get_opsc_item(main_outer)
-    ei = get_opsc_item(extra_inner)
+    
     eo = get_opsc_item(extra_outer)
 
-    shape = translate([0,0,-depth/2])(union()(difference()(mo,mi), difference()(eo,ei)))
-
+    if not exclude_clearance:        
+        ei = get_opsc_item(extra_inner)
+        shape = translate([0,0,-depth/2])(union()(difference()(mo,mi), difference()(eo,ei)))
+    else:
+        ex = 4
+        extra_inner["h"] = depth+ex
+        extra_inner["pos"] = [pos[0], pos[1], pos[2] - ex/2]
+        ei = get_opsc_item(extra_inner)
+        shape = translate([0,0,-depth/2])(mo, ei)
     return shape
 
 
 
     return get_opsc_item(p2)
 
+def oring(params):
+    p2 = copy.deepcopy(params) 
+    id = params["id"]
+    depth = params["depth"]    
+
+    p2["shape"] = "cylinder"
+    p2["h"] = depth
+
+    rot_rad = id + depth/2
+    rv = rotate_extrude(angle=360)(translate([rot_rad,0,0])(circle(r=depth/2)))
+
+    return rv
+
+def vpulley(params):
+    id = params["id"]     
+
+    b_y = 0
+    b_x = 3.6
+    t_y = 23
+    t_x = 12
+    points = []
+    points.append([b_x, b_y])
+    points.append([t_x, t_y])
+    points.append([-t_x, t_y])
+    points.append([-b_x, b_y])
+
+    rot_rad = id
+    shape = rotate([0,0,-90])(polygon(points=points))
+    rv = rotate_extrude(angle=360)(translate([rot_rad,0,0])(shape))
+
+    return rv    
+
+def polyg_tube(params):
+    p2 = copy.deepcopy(params)
+    p2["r"] = p2["r1"]
+    p2["type"] = "positive"
+    outer_tube = polyg(p2)
+    p2 = copy.deepcopy(params)
+    p2["r"] = p2["r2"]
+    p2["type"] = "negative"
+    inner_tube = polyg(p2)
+    return get_opsc_transform(params,difference()(outer_tube,inner_tube))
+
+def polyg_tube_half(params):
+    p2 = copy.deepcopy(params)
+    
+    keys = ["pos", "rotX", "rotY", "rotZ"]
+    # remove all keys in key from p2
+    for key in keys:
+        if key in p2:
+            del p2[key]
+
+    
+    item = polyg_tube(p2)
+    width = p2.get("r1", 10) *2 
+    height = p2.get("r1", 10)
+    depth = p2.get("depth", 10)
+    size = [width, height, depth]
+    cut_cube = translate([0,height/2,depth/2])(cube(size=size, center=True))
+    #cut difference away cube
+    item = difference()(item,cut_cube)
+    #item = get_opsc_transform(params,item)
+    return item
+
+
+
+
 def polyg(params):
     p2 = copy.deepcopy(params) 
     p2["type"] = "positive"
     p2["shape"] = "polygon"
     p2["pos"] = [0,0,0]
-    sides = p2["sides"]
+    sides = p2.get("sides", 6)
     radius = p2["r"]    
     angles = [i * 360 / sides for i in range(sides)]
     points = regular_polygon(sides, radius)
@@ -447,7 +681,7 @@ import solid as solidpython
 
 
 def load_scad_objects():
-    opsc_library_gen.gen_library(defined_objects)
+   opsc_library_gen.gen_library(defined_objects)
 
 import random
 
