@@ -2,7 +2,7 @@ from solid import *
 import os
 import subprocess
 
-import oomB
+#import oomB
 
 import opsc_library_gen
 
@@ -34,7 +34,7 @@ def set_mode(m):
     countersunk_dict['M3']['height'] = 1.7
 
 
-def opsc_make_object(filename, objects, save_type="none",resolution=50, layers = 1, tilediff = 200, mode="laser", overwrite=True, start = 1.5):
+def opsc_make_object(filename, objects, save_type="none",resolution=50, layers = 1, tilediff = 200, mode="laser", overwrite=True, start = 1.5, render=True):
     filename_test = filename.replace(".scad",".png")
     if overwrite or not os.path.exists(filename_test):
         set_mode(mode)
@@ -44,14 +44,14 @@ def opsc_make_object(filename, objects, save_type="none",resolution=50, layers =
         # Save the final object to the specified filename    
         scad_render_to_file(final_object, filename, file_header='$fn = %s;' % resolution, include_orig_code=False)
         if save_type == "all":
-            saveToAll(filename)
+            saveToAll(filename, render=render)
         elif save_type == "dxf":
             saveToDxf(filename)
         if mode == "laser":
             filename_laser = filename.replace(".scad","_flat.scad")
             scad_render_to_file(getLaser(final_object, layers=layers, tilediff=tilediff, start = start), filename_laser, file_header='$fn = %s;' % resolution, include_orig_code=False) 
             if save_type == "all":
-                saveToAll(filename_laser)
+                saveToAll(filename_laser, render=render)
             elif save_type == "dxf" or save_type == "laser":
                 saveToDxf(filename_laser)
     else:
@@ -115,7 +115,7 @@ def get_opsc_item(params):
     basic_shapes = ['cube', 'sphere', 'cylinder']
     
     # An array of function names for other shapes
-    other_shapes = ['hole', 'slot', 'slot_small', 'rounded_rectangle', 'rounded_rectangle_extra', 'sphere_rectangle', 'countersunk', 'polyg', 'polyg_tube', 'polyg_tube_half', 'bearing', 'oring', 'vpulley', ]
+    other_shapes = ['hole', 'slot', 'slot_small', 'text_hollow', "tube", 'tray', 'rounded_rectangle', 'rounded_rectangle_extra', 'sphere_rectangle', 'countersunk', 'polyg', 'polyg_tube', 'polyg_tube_half', 'bearing', 'oring', 'vpulley', ]
     
 
 
@@ -252,13 +252,24 @@ def opsc_easy(type, shape, **kwargs):
         'type': type,
         'shape': shape
     }
-    for param in ['size', 'r', 'r1', 'r2', 'd', 'h', 'rw', 'rh', 'dw', 'dh', 'pos', 'x', 'y', 'z', 'rot', 'rotX', 'rotY', 'rotZ', "w", "inclusion", 'sides', 'height', "m", "id", "od", "depth", "exclude_clearance", "clearance", "points","text","valign","halign","font","inset"]:
+    for param in ['size', 'r', 'radius', 'r1', 'r2', 'd', 'h', 'rw', 'rh', 'dw', 'dh', 'pos', 'x', 'y', 'z', 'rot', 'rotX', 'rotY', 'rotZ', "w", "inclusion", 'sides', 'height', 'width', "m", "id", "od", "depth", "exclude_clearance", "clearance", "points","text","valign","halign","font","inset","wall_thickness","extra","wall_thickness", "loc"]:
         if param in kwargs:
             obj[param] = kwargs[param]
     return obj
 
 def hole(params):
-    p2 = copy.deepcopy(params)  
+    try:
+        params["r"] = params["r"]
+    except:
+        params["r"] = params["radius"]
+    
+
+
+
+    
+    
+    p2 = copy.deepcopy(params) 
+
     # Check if the radius is a string and replace it with the corresponding value from the dictionary
     if isinstance(p2['r'], str):
         p2['r'] = radius_dict[p2['r']]
@@ -273,6 +284,32 @@ def hole(params):
     p2["type"] = "positive"
 
     return get_opsc_item(p2)
+
+def tube(params):
+    try:
+        params["r"] = params["r"]
+    except:
+        params["r"] = params["radius"]
+    p2 = copy.deepcopy(params)  
+    # Check if the radius is a string and replace it with the corresponding value from the dictionary
+    if isinstance(p2['r'], str):
+        p2['r'] = radius_dict[p2['r']]
+    
+    # Set the height to 100 if not specified
+    if 'h' not in p2:
+        p2['h'] = 100
+        p2["pos"] = [0,0,-50]
+    p2["center"] = True
+    # Create the cylinder object
+    p2["shape"] = "cylinder"
+    p2["type"] = "negative"
+    inside = get_opsc_item(p2) 
+    p2 = copy.deepcopy(p2)
+    p2["type"] = "positive"
+    p2["r"] = p2["r"] + p2["wall_thickness"]    
+    outside = get_opsc_item(p2)
+    return difference()(outside,inside)
+
 
 import copy
 
@@ -379,6 +416,31 @@ def rounded_rectangle(params):
     bro = get_opsc_item(br)    
     return hull()(tlo, tro, blo, bro).set_modifier(m)
 
+
+def tray(params):
+    wall_thickness = params.get("wall_thickness", 1)
+    #see if size is there is not then set to width height depth_mm
+    try:
+        params["size"] = params["size"]
+    except:
+        params["size"] = [params["width"], params["height"], params["depth"]]
+        del params["width"]
+        del params["height"]
+        del params["depth"]
+
+    radius =   params.get("radius", 5)
+    
+    outside = rounded_rectangle(params)
+    p2 = copy.deepcopy(params)
+    inside_radius = radius - wall_thickness/2
+    p2["r"] = inside_radius
+    #remove wall thickness from size
+    p2["size"][0] = p2["size"][0] - wall_thickness
+    p2["size"][1] = p2["size"][1] - wall_thickness
+    p2["size"][2] = p2["size"][2] + 100    
+    inside = sphere_rectangle(p2)
+
+    return difference()(outside, translate([0,0,wall_thickness/2])(inside))
 
 def rounded_rectangle_extra(params): 
     m = params.get("m", "")
@@ -666,6 +728,24 @@ def regular_polygon(num_sides, radius):
         points.append((x, y))
     return points
 
+def text_hollow(params):
+    wall_thickness = params.get("wall_thickness", 0.5)
+    extra = params.get("extra", "")
+    params["shape"] = "text"
+    p2 = copy.deepcopy(params)
+    text_big = get_opsc_item(p2)    
+    p2 = copy.deepcopy(params)
+    little_text = text(text=p2["text"], size=p2["size"], font=p2["font"], halign=p2["halign"], valign=p2["valign"])
+    little_text = offset(r=-wall_thickness)(little_text)
+    little_text = linear_extrude(p2["height"]-wall_thickness)(little_text)
+    #move z down wall_thickness in p2
+    p2["pos"][2] = p2["pos"][2] - wall_thickness
+    if extra == "reverse":
+        p2["pos"][2] = p2["pos"][2] + wall_thickness * 2
+    little_text = get_opsc_transform(p2,little_text)
+    return difference()(text_big, little_text)
+
+
 def import_scad_object(filename):
     # Import the .scad file and convert it to a solidpython object
     #filename = "parts"
@@ -723,8 +803,8 @@ def test(num_objects):
     return objects
 
 ####### old file saving
-def saveToAll(fileIn):
-    saveToFileAll(fileIn)
+def saveToAll(fileIn, render=True):
+    saveToFileAll(fileIn, render=render)
     
 def saveToTheRest(fileIn):
 
@@ -764,16 +844,45 @@ def saveToFile(fileIn, fileOut,extra=""):
     subprocess.run(launchStr)
     x=0
 
-def saveToFileAll(fileIn, extra=""):
+def saveToFileAll(fileIn, extra="", render=True):
     #extra = extra + " --colorscheme Tomorrow"
-    formats = ["dxf","png","svg","stl","csg"]
+    launch_strings = []
+    #add openscad
+    launch_strings.append("openscad")
+    if render:
+        launch_strings.append(f'--render')
+    formats = ["dxf","png","svg","stl"]
+    
     format_string = ""
     for f in formats:
         file_out = fileIn.replace(".scad","."+f)
-        format_string = f'{format_string} -o "{file_out}" '
-    launchStr = f'openscad {format_string} {extra} --render "{fileIn}"'
+        format_string = f'{format_string} -o "{file_out}"'
+        #add format string to launch string
+        launch_strings.append(f"-o")
+        launch_strings.append(f'{file_out}')
+                              
+    # add -- render filein
+    
+    launch_strings.append(f'{fileIn}')
+                          
+        
+    #launchStr = f'openscad {format_string} {extra} --render "{fileIn}"'
+    #launchStr = f'openscad -h'
+    launchStr = ",".join(launch_strings)
     print("            saveToFile launch string: " + launchStr)
-    subprocess.run(launchStr)
+    #if fileout folder doesn't exist, create it
+    if not os.path.exists(os.path.dirname(file_out)):
+        #create fodler
+        os.makedirs(os.path.dirname(file_out))
+
+
+    #subprocess.run(launchStr)
+    result = subprocess.run(launch_strings)
+    # print result with description of what's happening
+    print(f"            saveToFileAll result: {result}")
+
+
+    #subprocess.Popen(launch_strings)
     x=0
 
 def getLaser(final_object,start=1.5,layers=1,thickness=3,tilediff=200):
