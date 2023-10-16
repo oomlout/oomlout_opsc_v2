@@ -18,20 +18,20 @@ countersunk_dict = {}
 def set_mode(m):
     global mode
     mode = m
-    radius_dict['M6'] = 6.5/2
-    radius_dict['M3'] = 3.3/2
+    radius_dict['m6'] = 6.5/2
+    radius_dict['m3'] = 3.3/2
     if mode == "laser":
-        radius_dict['M6'] = 6/2
-        radius_dict['M3'] = 3/2
+        radius_dict['m6'] = 6/2
+        radius_dict['m3'] = 3/2
 
-    countersunk_dict['M3'] = {}
-    countersunk_dict['M3']['little_rad'] = radius_dict['M3']
-    countersunk_dict['M3']['big_rad'] = (5.5+0.6)/2
+    countersunk_dict['m3'] = {}
+    countersunk_dict['m3']['little_rad'] = radius_dict['m3']
+    countersunk_dict['m3']['big_rad'] = (5.5+0.6)/2
     if mode == "laser":
-        countersunk_dict['M3']['big_rad'] = (4.75+0.6)/2
-        countersunk_dict['M3']['little_rad'] = (4.75+0.6)/2
+        countersunk_dict['m3']['big_rad'] = (4.75+0.6)/2
+        countersunk_dict['m3']['little_rad'] = (4.75+0.6)/2
 
-    countersunk_dict['M3']['height'] = 1.7
+    countersunk_dict['m3']['height'] = 1.7
 
 
 def opsc_make_object(filename, objects, save_type="none",resolution=50, layers = 1, tilediff = 200, mode="laser", overwrite=True, start = 1.5, render=True):
@@ -62,7 +62,7 @@ def opsc_get_object(objects, mode = "laser"):
     # Create the solidpython objects only include the positive objects and if they don't have inclusion or their inclusion is either all or mode
     # Initialize an empty list to store the results
     positive_objects = []
-
+    
     # Iterate over the "objects" list
     for objs in objects:
         #if objs is a list put it in a list
@@ -78,7 +78,7 @@ def opsc_get_object(objects, mode = "laser"):
                     # Call the "get_opsc_item" function with the current object as an argument
                     opsc_item = get_opsc_item(obj)
                     # Add the result to the "positive_objects" list
-                    positive_objects.append(opsc_item)
+                    positive_objects.append(opsc_item)    
 # Initialize an empty list to store the results
     negative_objects = []
 
@@ -98,15 +98,58 @@ def opsc_get_object(objects, mode = "laser"):
                     opsc_item = get_opsc_item(obj)
                     # Add the result to the "negative_objects" list
                     negative_objects.append(opsc_item)
-        
-        #positive_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'positive']
-        #negative_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'negative']
-        # Union the positive objects
-        positive_object = union()(*positive_objects)
-        # Union the negative objects
-        negative_object = union()(*negative_objects)
-    # Create the final object by subtracting the negative objects from the positive objects
-    return difference()(positive_object, negative_object)
+    ### positive positive objects (add at the end)
+    
+    # Iterate over the "objects" list
+    positive_positive_objects = []
+    for objs in objects:        
+        #if objs is a list put it in a list
+        #unpacking in case its a list of lists
+        if isinstance(objs, dict):
+            objs = [objs]
+        for obj in objs:
+            # Check if the current object has a "type" key with a value of "negative"
+            if obj['type'] == 'pp':
+                # Check if the current object has an "inclusion" key and its value matches "mode",
+                # or if the current object does not have an "inclusion" key at all
+                if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
+                    # Call the "get_opsc_item" function with the current object as an argument
+                    opsc_item = get_opsc_item(obj)
+                    # Add the result to the "negative_objects" list
+                    positive_positive_objects.append(opsc_item)
+    # Iterate over the "objects" list
+    negative_negative_objects = []
+    for objs in objects:        
+        #if objs is a list put it in a list
+        #unpacking in case its a list of lists
+        if isinstance(objs, dict):
+            objs = [objs]
+        for obj in objs:
+            # Check if the current object has a "type" key with a value of "negative"
+            if obj['type'] == 'nn':
+                # Check if the current object has an "inclusion" key and its value matches "mode",
+                # or if the current object does not have an "inclusion" key at all
+                if not 'inclusion' in obj or obj['inclusion'] == "all" or obj['inclusion'] == mode:
+                    # Call the "get_opsc_item" function with the current object as an argument
+                    opsc_item = get_opsc_item(obj)
+                    # Add the result to the "negative_objects" list
+                    negative_negative_objects.append(opsc_item)
+    #positive_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'positive']
+    #negative_objects = [get_opsc_item(obj) for obj in objects if obj['type'] == 'negative']
+    # Union the positive objects
+    positive_object = union()(*positive_objects)
+    # Union the negative objects
+    negative_object = union()(*negative_objects)
+# Create the final object by subtracting the negative objects from the positive objects
+    return_value = difference()(positive_object, negative_object)
+
+    if (len(positive_positive_objects) > 0):
+        positive_positive_object = union()(*positive_positive_objects)
+        return_value = union()(return_value, positive_positive_object)
+    if (len(negative_negative_objects) > 0):
+        negative_negative_object = union()(*negative_negative_objects)
+        return_value = difference()(return_value, negative_negative_object)
+    return return_value
 
 def get_opsc_item(params):
     # A dictionary to map radius string values to numerical values
@@ -115,7 +158,7 @@ def get_opsc_item(params):
     basic_shapes = ['cube', 'sphere', 'cylinder']
     
     # An array of function names for other shapes
-    other_shapes = ['hole', 'slot', 'slot_small', 'text_hollow', "tube", 'tray', 'rounded_rectangle', 'rounded_rectangle_extra', 'sphere_rectangle', 'countersunk', 'polyg', 'polyg_tube', 'polyg_tube_half', 'bearing', 'oring', 'vpulley', ]
+    other_shapes = ['hole', 'slot', 'slot_small', 'text_hollow', "tube", 'tray', 'rounded_rectangle', 'rounded_rectangle_extra', 'sphere_rectangle', 'countersunk', 'polyg', 'polyg_tube', 'polyg_tube_half', 'bearing', 'oring', 'vpulley', 'd_shaft']
     
 
 
@@ -297,8 +340,13 @@ def tube(params):
     
     # Set the height to 100 if not specified
     if 'h' not in p2:
-        p2['h'] = 100
-        p2["pos"] = [0,0,-50]
+        if 'height' in p2:
+            p2['h'] = p2['height']
+        elif 'depth' in p2:
+            p2['h'] = p2['depth']
+        else:
+            p2['h'] = 100
+            p2["pos"] = [0,0,-50]
     p2["center"] = True
     # Create the cylinder object
     p2["shape"] = "cylinder"
@@ -336,7 +384,51 @@ def countersunk(params):
     top = get_opsc_item(cp)
     return union()(hol,top)
 
+def d_shaft(kwargs):
+    
+    #p2["m"] = "#"
+    radius = kwargs.get("radius", kwargs.get("r", ""))
+    id = kwargs.get("id", "") #the radius of the d side
+    depth = kwargs.get("depth", kwargs.get("h", ""))
+    typ = kwargs.get("type", kwargs.get("t", "positive"))
+    pos = kwargs.get("pos", [0,0,0])
+    typ_other = ""
+    #if typ = negative make it n
+    if typ == "negative":
+        typ = "n"
+    if typ == "positive":
+        typ = "p"
+    if typ == "n":
+        typ_other = "p"
+    if typ == "p":
+        typ_other = "n"
+    if typ == "pp":
+        typ_other = "nn"
+    if typ == "nn":
+        typ_other = "pp"
+    
 
+
+    shaft = copy.deepcopy(kwargs) 
+    shaft["shape"] = "cylinder"
+    shaft["h"] = depth
+    shaft["r"] = radius
+    pos_shift = [0,0,-depth]
+    shaft["pos"]  = [pos[0] + pos_shift[0], pos[1] + pos_shift[1], pos[2] + pos_shift[2]]
+    shaft["type"] = typ
+    shaft_shape = get_opsc_item(shaft)
+
+    indent = copy.deepcopy(kwargs) 
+    indent["shape"] = "cube"
+    indent.pop("r","")
+    dif = radius*2-id
+    indent["size"] = [radius*2, dif, depth]
+    pos_shift = [0,dif,-depth]
+    indent["pos"]  = [pos[0] + pos_shift[0], pos[1] + pos_shift[1], pos[2] + pos_shift[2]]
+    indent["type"] = typ_other
+    indent_shape = get_opsc_item(indent)    
+
+    return difference()(shaft_shape, indent_shape)
 
 def slot_small(params):  
     p2 = copy.deepcopy(params) 
